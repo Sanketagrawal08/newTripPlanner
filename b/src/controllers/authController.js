@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 
 const registerController = async (req, res) => {
   const { name, email, password } = req.body;
-   console.log(name)
+
   if (!name || !email || !password) {
     return res.status(400).send("One field is empty error");
   }
@@ -21,13 +21,9 @@ const registerController = async (req, res) => {
 
     await newUser.save();
 
-    const token = jwt.sign(
-      { id: newUser._id, email: newUser.email },
-      "JWTT",
-      {
-        expiresIn: "1d",
-      }
-    );
+    const token = jwt.sign({ id: newUser._id, email: newUser.email }, "snaket", {
+      expiresIn: "1d",
+    });
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -49,35 +45,48 @@ const registerController = async (req, res) => {
   }
 };
 
+
+
 const loginController = async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).send("Enter both email and password");
-  }
+  const user = await userModel.findOne({ email });
+  if (!user) return res.status(401).json({ message: "Invalid credentials" });
 
+  // password match check karo ...
+
+  const token = jwt.sign(
+    { id: user._id, email: user.email },
+    process.env.JWT_SECRET || "snaket",
+    { expiresIn: "1d" }
+  );
+
+  // HttpOnly cookie set
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production", // prod me true
+    sameSite: "strict",
+    maxAge: 24 * 60 * 60 * 1000, // 1 day
+  });
+
+  res.json({
+    message: "Login successful",
+    user: { id: user._id, email: user.email },
+  });
+};
+
+const logoutController = async (req, res) => {
   try {
-    const user = await userModel.findOne({ email: email });
-    if (!user) {
-      return res.status(401).send("Invalid credentials");
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).send("Invalid credentials");
-    }
-
-    res.status(200).json({
-      message: "Login successful",
-      user: {
-        name: user.name,
-        email: user.email,
-      },
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
     });
-  } catch (error) {
-    res.status(500).send("Server error");
-    console.log(error);
+    res.json({ message: "Logout successful" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error during logout" });
   }
 };
 
-export default { registerController, loginController };
+export default { registerController, loginController,logoutController };

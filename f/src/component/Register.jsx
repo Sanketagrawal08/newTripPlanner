@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import {useNavigate} from "react-router-dom"
 import useAuthStore from '../store/authStore';
 
 const Register = () => {
   const [form, setForm] = useState({ name: '', email: '', password: '' });
-  const register = useAuthStore();
+  const {register,isAuthenticated} = useAuthStore();
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
+ const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       await register(form.name, form.email, form.password);
@@ -19,6 +21,13 @@ const Register = () => {
       console.log(err)
     }
   };
+
+
+   useEffect(() => {
+      if (isAuthenticated) {
+        navigate("/home");
+      }
+    }, [isAuthenticated, navigate]);
 
   return (
     <form onSubmit={handleSubmit}>

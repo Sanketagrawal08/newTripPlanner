@@ -2,6 +2,7 @@ import cohere from "../services/cohereclient.js";
 import { jsonrepair } from "jsonrepair";
 import axios from "axios";
 import TripModel from "../models/trip.model.js";
+import UserModel from "../models/user.model.js";
 
 const UNSPLASH_KEY = "A37NTQMDIgFMWbq5kq1uEslTH8hWwVnDSi4ZYfKTdJE";
 const FALLBACK_IMAGE = "https://via.placeholder.com/400x300?text=No+Image";
@@ -90,7 +91,7 @@ Rules:
 };
 
 export const saveTripController = async (req, res) => {
- try {
+  try {
     const userId = req.user.id; // got from middleware
     const { tripOutline } = req.body;
 
@@ -108,5 +109,52 @@ export const saveTripController = async (req, res) => {
   } catch (error) {
     console.error("Error saving trip:", error);
     return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getTripListController = async (req, res) => {
+  const userId = req.user.id;
+
+  const trip = await TripModel.find({ userId: userId });
+
+  return res.status(200).json(trip);
+};
+
+export const updateEmergencyContactsController = async (req, res) => {
+  const { contact } = req.body;
+
+  try {
+    const user = await UserModel.findById(req.user.id);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    user.emergencyContacts.push(contact)
+    await user.save();
+
+    res.json({
+      msg: "Emergency contacts updated",
+      contacts: user.emergencyContacts,
+    });
+  } catch (err) {
+    res.status(500).json({ msg: "Server error", error: err.message });
+  }
+};
+
+export const getEmergencyContactsController = async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const user = await UserModel.findById(userId);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+    res
+      .status(200)
+      .json({
+        msg: "contacts",
+        contacts: Array.isArray(user.emergencyContacts)
+          ? user.emergencyContacts
+          : [],
+      });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ msg: "Server error in getemergency", error: error.message });
   }
 };

@@ -12,6 +12,8 @@ import useAuthStore from "./store/authStore";
 import TripForm from "./component/TripForm";
 import TripPreview from "./component/TripPreview";
 import TripList from "./component/TripList";
+import Layout from "./component/Layout";
+import EmergencyContacts from "./component/EmergencyContacts";
 
 const App = () => {
   const { checkAuth, isCheckingAuth, isAuthenticated } = useAuthStore();
@@ -22,29 +24,35 @@ const App = () => {
 
   if (isCheckingAuth) return <p>Loading...</p>;
 
-  const routes = createBrowserRouter([
-    { path: "/register", element: <Register /> },
-    { path: "/login", element: <Login /> },
-    {
-      path: "/home",
-      element: (
-        <ProtectedRoute>
-          <Home />
-        </ProtectedRoute>
-      ),
-    },
-    { path: "/trip-form", element: <TripForm /> },
-    {path:"/trip-preview", element: <TripPreview />},
-    {path:"/trip-lists", element: <TripList />},
-    {
-      path: "/",
-      element: isAuthenticated ? (
-        <Navigate to="/home" />
-      ) : (
-        <Navigate to="/login" />
-      ),
-    },
-  ]);
+const routes = createBrowserRouter([
+  { path: "/register", element: <Register /> },
+  { path: "/login", element: <Login /> },
+
+  {
+    element: (
+      <ProtectedRoute>
+        <Layout />   {/* 👈 Navbar humesha visible inside protected layout */}
+      </ProtectedRoute>
+    ),
+    children: [
+      { path: "/home", element: <Home /> },
+      { path: "/trip-form", element: <TripForm /> },
+      { path: "/trip-preview", element: <TripPreview /> },
+      { path: "/trip-lists", element: <TripList /> },
+      {path:"/emergency-contacts", element : <EmergencyContacts />}
+    ],
+  },
+
+  {
+    path: "/",
+    element: isAuthenticated ? (
+      <Navigate to="/home" />
+    ) : (
+      <Navigate to="/login" />
+    ),
+  },
+]);
+
 
   return <RouterProvider router={routes} />;
 };

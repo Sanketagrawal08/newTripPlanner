@@ -23,7 +23,7 @@ const TripForm = () => {
     setLoading(true);
 
     try {
-      const res = await api.post("/trip-overview", formData);
+      const res = await api.post("/trip/overview", formData);
       const tripOutline = res.data?.overview?.trip_outline || [];
       // Redirect to preview page with generated trip
       navigate("/trip-preview", { state: { tripOutline, formData } });

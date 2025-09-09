@@ -1,37 +1,72 @@
 import React, { useEffect, useState } from "react";
 import api from "../api";
-import { CalendarDays, ChevronDown, ChevronUp } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronUp, UserPlus } from "lucide-react";
 
 const TripList = () => {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [openTrip, setOpenTrip] = useState(null); // track which trip is open
+  const [openTrip, setOpenTrip] = useState(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [selectedTrip, setSelectedTrip] = useState(null);
+  const userId = "current-logged-in-user-id"; // Replace with auth user id from context or auth state
 
   useEffect(() => {
-    const getTripList = async () => {
-      try {
-        const res = await api.get("/trip/get-trip-lists");
-        const data = res.data;
-        if (Array.isArray(data)) {
-          setTrips(data);
-        } else if (data && typeof data === "object") {
-          setTrips([data]);
-        } else {
-          setTrips([]);
-        }
-      } catch (error) {
-        console.log("Error fetching trips:", error);
-        setTrips([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     getTripList();
   }, []);
 
-  const toggleTrip = (id) => {
-    setOpenTrip(openTrip === id ? null : id); // collapse if open, expand otherwise
+  const getTripList = async () => {
+    try {
+      const res = await api.get("/trip/get-trip-lists");
+      let data = res.data;
+
+      // mark if current user is invited
+      if (Array.isArray(data)) {
+        data = data.map((trip) => ({
+          ...trip,
+          isUserInvited: trip.invites?.some((i) => i._id === userId),
+        }));
+        setTrips(data);
+      } else if (data && typeof data === "object") {
+        data.isUserInvited = data.invites?.some((i) => i._id === userId);
+        setTrips([data]);
+      } else {
+        setTrips([]);
+      }
+    } catch (error) {
+      console.log("Error fetching trips:", error);
+      setTrips([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleTrip = (id) => setOpenTrip(openTrip === id ? null : id);
+
+  const sendInvite = async (tripId) => {
+    if (!inviteEmail) return alert("Enter a valid email!");
+    try {
+      await api.post(`/trip/${tripId}/invite`, { email: inviteEmail });
+      alert("Invite sent!");
+      setInviteEmail("");
+      setSelectedTrip(null);
+      getTripList();
+    } catch (error) {
+      alert(error.response?.data?.message || "Error sending invite");
+    }
+  };
+
+  const respondInvite = async (tripId, action) => {
+    try {
+      if (action === "accept") {
+        await api.post(`/trip/${tripId}/accept`);
+      } else {
+        await api.post(`/trip/${tripId}/reject`);
+      }
+      alert(`Invite ${action}`);
+      getTripList();
+    } catch (error) {
+      alert(error.response?.data?.message || "Error responding to invite");
+    }
   };
 
   return (
@@ -49,11 +84,7 @@ const TripList = () => {
         </div>
       ) : (
         trips.map((trip) => (
-          <div
-            key={trip._id}
-            className="border rounded-xl shadow-md mb-6 bg-white"
-          >
-            {/* Trip Header (Clickable) */}
+          <div key={trip._id} className="border rounded-xl shadow-md mb-6 bg-white">
             <button
               onClick={() => toggleTrip(trip._id)}
               className="w-full flex justify-between items-center p-4 text-left font-semibold text-lg text-gray-800 hover:bg-gray-50 rounded-t-xl"
@@ -69,80 +100,117 @@ const TripList = () => {
               )}
             </button>
 
-            
-
-            {/* Dropdown Content */}
             {openTrip === trip._id && (
-              <div className="p-6 border-t">
-                {trip.tripOutline.map((day) => (
-                  <div key={day._id} className="mb-6">
-                    <h3 className="font-bold text-md text-gray-700 mb-3">
-                      Day {day.day}
-                    </h3>
+              <div className="p-6 border-t space-y-6">
+                {/* Participants */}
+                <div>
+                  <h3 className="font-semibold text-gray-700 mb-2">Participants:</h3>
+                  {trip.participants?.length > 0 ? (
+                    <ul className="list-disc ml-6 text-gray-800">
+                      {trip.participants.map((p) => (
+                        <li key={p._id}>
+                          {p.name} ({p.email})
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-500">No participants yet</p>
+                  )}
+                </div>
 
-                    <div className="flex flex-col md:flex-row gap-4">
-                      {/* Morning */}
-                      <div className="flex-1 border rounded-lg shadow-sm bg-gray-50 overflow-hidden">
-                        <img
-                          src={day.morning.place_image_url}
-                          alt={day.morning.place}
-                          className="w-full h-36 object-cover"
-                        />
-                        <div className="p-3">
-                          <p className="font-semibold text-gray-900">
-                            {day.morning.place}
-                          </p>
-                          <p className="text-sm text-gray-700">
-                            Ticket: ₹{day.morning.ticket_price}
-                          </p>
-                          <p className="text-sm text-gray-700">
-                            Best time: {day.morning.best_time_to_visit}
-                          </p>
-                        </div>
-                      </div>
+                {/* Pending Invites */}
+                <div>
+                  <h3 className="font-semibold text-gray-700 mb-2">Pending Invites:</h3>
+                  {trip.invites?.length > 0 ? (
+                    <ul className="list-disc ml-6 text-gray-800">
+                      {trip.invites.map((i) => (
+                        <li key={i._id}>
+                          {i.name} ({i.email})
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-500">No pending invites</p>
+                  )}
+                </div>
 
-                      {/* Afternoon */}
-                      <div className="flex-1 border rounded-lg shadow-sm bg-gray-50 overflow-hidden">
-                        <img
-                          src={day.afternoon.place_image_url}
-                          alt={day.afternoon.place}
-                          className="w-full h-36 object-cover"
-                        />
-                        <div className="p-3">
-                          <p className="font-semibold text-gray-900">
-                            {day.afternoon.place}
-                          </p>
-                          <p className="text-sm text-gray-700">
-                            Ticket: ₹{day.afternoon.ticket_price}
-                          </p>
-                          <p className="text-sm text-gray-700">
-                            Best time: {day.afternoon.best_time_to_visit}
-                          </p>
-                        </div>
-                      </div>
+                {/* Invite Friend */}
+                <div className="mt-4">
+                  {selectedTrip === trip._id ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        placeholder="Friend's email"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        className="border rounded px-3 py-1 flex-1"
+                      />
+                      <button
+                        onClick={() => sendInvite(trip._id)}
+                        className="bg-blue-600 text-white px-4 py-1 rounded"
+                      >
+                        Send
+                      </button>
+                      <button
+                        onClick={() => setSelectedTrip(null)}
+                        className="bg-gray-300 px-3 py-1 rounded"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setSelectedTrip(trip._id)}
+                      className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-100"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      Invite Friend
+                    </button>
+                  )}
+                </div>
 
-                      {/* Evening */}
-                      <div className="flex-1 border rounded-lg shadow-sm bg-gray-50 overflow-hidden">
-                        <img
-                          src={day.evening.place_image_url}
-                          alt={day.evening.place}
-                          className="w-full h-36 object-cover"
-                        />
-                        <div className="p-3">
-                          <p className="font-semibold text-gray-900">
-                            {day.evening.place}
-                          </p>
-                          <p className="text-sm text-gray-700">
-                            Ticket: ₹{day.evening.ticket_price}
-                          </p>
-                          <p className="text-sm text-gray-700">
-                            Best time: {day.evening.best_time_to_visit}
-                          </p>
-                        </div>
+                {/* Accept / Reject buttons */}
+                {trip.isUserInvited && (
+                  <div className="mt-4 flex gap-3">
+                    <button
+                      onClick={() => respondInvite(trip._id, "accept")}
+                      className="bg-green-600 text-white px-4 py-1 rounded"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => respondInvite(trip._id, "reject")}
+                      className="bg-red-600 text-white px-4 py-1 rounded"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+
+                {/* Trip Outline */}
+                <div className="mt-6">
+                  {trip.tripOutline.map((day) => (
+                    <div key={day._id} className="mb-6">
+                      <h3 className="font-bold text-md text-gray-700 mb-3">Day {day.day}</h3>
+                      <div className="flex flex-col md:flex-row gap-4">
+                        {["morning", "afternoon", "evening"].map((time) => (
+                          <div key={time} className="flex-1 border rounded-lg shadow-sm bg-gray-50 overflow-hidden">
+                            <img
+                              src={day[time].place_image_url}
+                              alt={day[time].place}
+                              className="w-full h-36 object-cover"
+                            />
+                            <div className="p-3">
+                              <p className="font-semibold text-gray-900">{day[time].place}</p>
+                              <p className="text-sm text-gray-700">Ticket: ₹{day[time].ticket_price}</p>
+                              <p className="text-sm text-gray-700">Best time: {day[time].best_time_to_visit}</p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>

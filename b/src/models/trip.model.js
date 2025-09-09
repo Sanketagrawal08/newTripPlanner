@@ -15,9 +15,12 @@ const daySchema = new mongoose.Schema({
 });
 
 const tripSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: "User" },
+  owner: { type: mongoose.Schema.Types.ObjectId, required: true, ref: "User" },
   tripOutline: [daySchema], // array of day
   createdAt: { type: Date, default: Date.now },
+  currentStatus: {type: String, default:"PENDING"},
+  participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  invites: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
 });
 
 const TripModel = mongoose.model("Trip", tripSchema);

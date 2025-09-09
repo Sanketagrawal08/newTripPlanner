@@ -113,11 +113,52 @@ export const saveTripController = async (req, res) => {
 };
 
 export const getTripListController = async (req, res) => {
-  const userId = req.user.id;
+  try {
+    // support both req.user.id or req.user._id depending on your auth middleware
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-  const trip = await TripModel.find({ userId: userId });
+    // Find trips where user is owner OR participant OR invited
+    const trips = await TripModel.find({
+      $or: [
+        { owner: userId },
+        { participants: userId },
+        { invites: userId }
+      ]
+    })
+      .populate("owner", "name email")
+      .populate("participants", "name email")
+      .populate("invites", "name email");
 
-  return res.status(200).json(trip);
+    // Attach userRole and isUserInvited to each trip
+    const tripsWithRole = trips.map((trip) => {
+      const obj = trip.toObject();
+
+      let role = "viewer";
+      if (trip.owner && trip.owner._id.toString() === userId.toString()) {
+        role = "owner";
+      } else if (
+        Array.isArray(trip.participants) &&
+        trip.participants.some((p) => p._id.toString() === userId.toString())
+      ) {
+        role = "participant";
+      } else if (
+        Array.isArray(trip.invites) &&
+        trip.invites.some((i) => i._id.toString() === userId.toString())
+      ) {
+        role = "invited";
+      }
+
+      obj.userRole = role;
+      obj.isUserInvited = role === "invited";
+      return obj;
+    });
+
+    return res.status(200).json(tripsWithRole);
+  } catch (err) {
+    console.error("Error in getTripListController:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
 };
 
 export const updateEmergencyContactsController = async (req, res) => {
@@ -127,7 +168,7 @@ export const updateEmergencyContactsController = async (req, res) => {
     const user = await UserModel.findById(req.user.id);
     if (!user) return res.status(404).json({ msg: "User not found" });
 
-    user.emergencyContacts.push(contact)
+    user.emergencyContacts.push(contact);
     await user.save();
 
     res.json({
@@ -144,17 +185,103 @@ export const getEmergencyContactsController = async (req, res) => {
   try {
     const user = await UserModel.findById(userId);
     if (!user) return res.status(404).json({ msg: "User not found" });
-    res
-      .status(200)
-      .json({
-        msg: "contacts",
-        contacts: Array.isArray(user.emergencyContacts)
-          ? user.emergencyContacts
-          : [],
-      });
+    res.status(200).json({
+      msg: "contacts",
+      contacts: Array.isArray(user.emergencyContacts)
+        ? user.emergencyContacts
+        : [],
+    });
   } catch (error) {
     res
       .status(500)
       .json({ msg: "Server error in getemergency", error: error.message });
+  }
+};
+
+// Invite a friend
+export const sendInviteFriends = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const { email } = req.body;
+    const userId = req.user.id;
+
+    const trip = await TripModel.findById(tripId);
+    if (!trip) return res.status(404).json({ message: "Trip not found" });
+
+    // Only owner can invite
+    if (!trip.owner || trip.owner.toString() !== userId.toString()) {
+      return res.status(403).json({ message: "Only owner can invite friends" });
+    }
+
+    const friend = await UserModel.findOne({ email });
+    if (!friend)
+      return res
+        .status(400)
+        .json({ message: "User not registered. Ask them to sign up first." });
+
+    if (
+      trip.invites?.some((id) => id.toString() === friend._id.toString()) ||
+      trip.participants?.some((id) => id.toString() === friend._id.toString())
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Already invited or participant" });
+    }
+
+    trip.invites.push(friend._id);
+    await trip.save();
+
+    res.json({ message: "Invite sent successfully", trip });
+  } catch (err) {
+    console.error("Error in invitefriend", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Accept invite
+export const acceptInvite = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const userId = req.user.id;
+
+    const trip = await TripModel.findById(tripId);
+    if (!trip) return res.status(404).json({ message: "Trip not found" });
+
+    if (!trip.invites?.some((id) => id.toString() === userId.toString())) {
+      return res.status(400).json({ message: "No pending invite found" });
+    }
+
+    trip.invites = trip.invites.filter(
+      (id) => id.toString() !== userId.toString()
+    );
+
+    if (!trip.participants?.some((id) => id.toString() === userId.toString())) {
+      trip.participants.push(userId);
+    }
+
+    await trip.save();
+    res.json({ message: "Invite accepted", trip });
+  } catch (err) {
+    console.error("Error accepting invite:", err);
+    res.status(500).json({ message: "Server error in acceptinvite" });
+  }
+};
+
+// Reject invite
+export const rejectInvite = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const userId = req.user.id;
+
+    const trip = await TripModel.findById(tripId);
+    if (!trip) return res.status(404).json({ message: "Trip not found" });
+
+    trip.invites = trip.invites.filter((id) => id.toString() !== userId.toString());
+    await trip.save();
+
+    res.json({ message: "Invite rejected", trip });
+  } catch (err) {
+    console.error("Error rejecting invite:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };

@@ -1,17 +1,19 @@
-import React, { useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../api";
+import useTripStore from "../store/useTripStore";
 
 const TripForm = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
+  const { generateTrip, loading } = useTripStore();
+
+  const [formData, setFormData] = React.useState({
+    title: "",
     country: "",
     destination: "",
     budget: "",
     travellers: 1,
     days: 1,
   });
-  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -20,18 +22,12 @@ const TripForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-
     try {
-      const res = await api.post("/trip/overview", formData);
-      const tripOutline = res.data?.overview?.trip_outline || [];
-      // Redirect to preview page with generated trip
+      const tripOutline = await generateTrip(formData);
       navigate("/trip-preview", { state: { tripOutline, formData } });
     } catch (err) {
-      console.error("Error generating trip:", err);
       alert("Failed to generate trip. Please try again.");
-    } finally {
-      setLoading(false);
+      console.error(err);
     }
   };
 
@@ -42,71 +38,61 @@ const TripForm = () => {
           Plan Your Dream Trip
         </h2>
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Country</label>
-            <input
-              type="text"
-              name="country"
-              value={formData.country}
-              onChange={handleChange}
-              placeholder="e.g., India"
-              className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Destination</label>
-            <input
-              type="text"
-              name="destination"
-              value={formData.destination}
-              onChange={handleChange}
-              placeholder="e.g., Bhopal"
-              className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Budget (INR)</label>
-            <input
-              type="number"
-              name="budget"
-              value={formData.budget}
-              onChange={handleChange}
-              placeholder="e.g., 5000"
-              min={0}
-              className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Travellers</label>
-            <input
-              type="number"
-              name="travellers"
-              value={formData.travellers}
-              onChange={handleChange}
-              min={1}
-              className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Days</label>
-            <input
-              type="number"
-              name="days"
-              value={formData.days}
-              onChange={handleChange}
-              min={1}
-              className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-              required
-            />
-          </div>
+          <input
+            type="text"
+            name="title"
+            value={formData.title}
+            onChange={handleChange}
+            placeholder="Trip Title"
+            required
+            className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+          <input
+            type="text"
+            name="country"
+            value={formData.country}
+            onChange={handleChange}
+            placeholder="Country"
+            required
+            className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+          <input
+            type="text"
+            name="destination"
+            value={formData.destination}
+            onChange={handleChange}
+            placeholder="Destination"
+            required
+            className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+          <input
+            type="number"
+            name="budget"
+            value={formData.budget}
+            onChange={handleChange}
+            placeholder="Budget (INR)"
+            min={0}
+            required
+            className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+          <input
+            type="number"
+            name="travellers"
+            value={formData.travellers}
+            onChange={handleChange}
+            min={1}
+            required
+            className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+          <input
+            type="number"
+            name="days"
+            value={formData.days}
+            onChange={handleChange}
+            min={1}
+            required
+            className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
 
           <button
             type="submit"

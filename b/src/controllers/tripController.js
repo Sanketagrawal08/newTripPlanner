@@ -21,7 +21,7 @@ async function fetchPlacePhoto(placeName) {
 }
 
 export const generateTripOverviewController = async (req, res) => {
-  const { country, destination, budget, travellers, days } = req.body;
+  const { title,country, destination, budget, travellers, days } = req.body;
 
   const prompt = `
 You are a travel assistant. Generate a ${days}-day trip plan for ${destination}, ${country}.
@@ -93,14 +93,16 @@ Rules:
 export const saveTripController = async (req, res) => {
   try {
     const userId = req.user.id; // got from middleware
-    const { tripOutline } = req.body;
+    console.log(req.user.id)
+    const { title, tripOutline } = req.body;
 
     if (!tripOutline) {
       return res.status(400).json({ message: "tripOutline is required" });
     }
 
     const trip = new TripModel({
-      userId,
+      title,
+     owner: userId,
       tripOutline,
     });
 

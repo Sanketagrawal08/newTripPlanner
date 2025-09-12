@@ -3,7 +3,9 @@ import { Navigate, redirect, useLocation, useNavigate } from "react-router-dom";
 import api from "../api";
 
 const TripPreview = () => {
+  
   const { state } = useLocation();
+
   const { tripOutline, formData } = state || {};
   const [editedTrip, setEditedTrip] = useState(tripOutline || []);
   const [isEditing, setIsEditing] = useState(false);

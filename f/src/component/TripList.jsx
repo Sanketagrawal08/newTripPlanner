@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import api from "../api";
 import { CalendarDays, ChevronDown, ChevronUp, UserPlus } from "lucide-react";
+import useAuthStore from "../store/authStore";
 
 const TripList = () => {
   const [trips, setTrips] = useState([]);
@@ -8,7 +9,7 @@ const TripList = () => {
   const [openTrip, setOpenTrip] = useState(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [selectedTrip, setSelectedTrip] = useState(null);
-  const userId = "current-logged-in-user-id"; // Replace with auth user id from context or auth state
+  const user = useAuthStore(); // Auth user
 
   useEffect(() => {
     getTripList();
@@ -17,21 +18,7 @@ const TripList = () => {
   const getTripList = async () => {
     try {
       const res = await api.get("/trip/get-trip-lists");
-      let data = res.data;
-
-      // mark if current user is invited
-      if (Array.isArray(data)) {
-        data = data.map((trip) => ({
-          ...trip,
-          isUserInvited: trip.invites?.some((i) => i._id === userId),
-        }));
-        setTrips(data);
-      } else if (data && typeof data === "object") {
-        data.isUserInvited = data.invites?.some((i) => i._id === userId);
-        setTrips([data]);
-      } else {
-        setTrips([]);
-      }
+      setTrips(res.data || []);
     } catch (error) {
       console.log("Error fetching trips:", error);
       setTrips([]);
@@ -69,6 +56,18 @@ const TripList = () => {
     }
   };
 
+  const startTrip = async (tripId) => {
+    try {
+      console.log("Trip started!");
+
+      
+
+      getTripList(); // Refresh trips to reflect status
+    } catch (error) {
+      alert(error.response?.data?.message || "Error starting trip");
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6 flex items-center gap-2 text-gray-800">
@@ -84,7 +83,10 @@ const TripList = () => {
         </div>
       ) : (
         trips.map((trip) => (
-          <div key={trip._id} className="border rounded-xl shadow-md mb-6 bg-white">
+          <div
+            key={trip._id}
+            className="border rounded-xl shadow-md mb-6 bg-white"
+          >
             <button
               onClick={() => toggleTrip(trip._id)}
               className="w-full flex justify-between items-center p-4 text-left font-semibold text-lg text-gray-800 hover:bg-gray-50 rounded-t-xl"
@@ -104,7 +106,9 @@ const TripList = () => {
               <div className="p-6 border-t space-y-6">
                 {/* Participants */}
                 <div>
-                  <h3 className="font-semibold text-gray-700 mb-2">Participants:</h3>
+                  <h3 className="font-semibold text-gray-700 mb-2">
+                    Participants:
+                  </h3>
                   {trip.participants?.length > 0 ? (
                     <ul className="list-disc ml-6 text-gray-800">
                       {trip.participants.map((p) => (
@@ -120,7 +124,9 @@ const TripList = () => {
 
                 {/* Pending Invites */}
                 <div>
-                  <h3 className="font-semibold text-gray-700 mb-2">Pending Invites:</h3>
+                  <h3 className="font-semibold text-gray-700 mb-2">
+                    Pending Invites:
+                  </h3>
                   {trip.invites?.length > 0 ? (
                     <ul className="list-disc ml-6 text-gray-800">
                       {trip.invites.map((i) => (
@@ -170,7 +176,7 @@ const TripList = () => {
                 </div>
 
                 {/* Accept / Reject buttons */}
-                {trip.isUserInvited && (
+                {trip.userRole === "invited" && (
                   <div className="mt-4 flex gap-3">
                     <button
                       onClick={() => respondInvite(trip._id, "accept")}
@@ -187,23 +193,46 @@ const TripList = () => {
                   </div>
                 )}
 
+                {/* Start Trip button - only for owner */}
+                {trip.userRole === "owner" && (
+                  <div className="mt-4">
+                    <button
+                      onClick={() => startTrip(trip._id)}
+                      className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+                    >
+                      Start Trip
+                    </button>
+                  </div>
+                )}
+
                 {/* Trip Outline */}
                 <div className="mt-6">
                   {trip.tripOutline.map((day) => (
                     <div key={day._id} className="mb-6">
-                      <h3 className="font-bold text-md text-gray-700 mb-3">Day {day.day}</h3>
+                      <h3 className="font-bold text-md text-gray-700 mb-3">
+                        Day {day.day}
+                      </h3>
                       <div className="flex flex-col md:flex-row gap-4">
                         {["morning", "afternoon", "evening"].map((time) => (
-                          <div key={time} className="flex-1 border rounded-lg shadow-sm bg-gray-50 overflow-hidden">
+                          <div
+                            key={time}
+                            className="flex-1 border rounded-lg shadow-sm bg-gray-50 overflow-hidden"
+                          >
                             <img
                               src={day[time].place_image_url}
                               alt={day[time].place}
                               className="w-full h-36 object-cover"
                             />
                             <div className="p-3">
-                              <p className="font-semibold text-gray-900">{day[time].place}</p>
-                              <p className="text-sm text-gray-700">Ticket: ₹{day[time].ticket_price}</p>
-                              <p className="text-sm text-gray-700">Best time: {day[time].best_time_to_visit}</p>
+                              <p className="font-semibold text-gray-900">
+                                {day[time].place}
+                              </p>
+                              <p className="text-sm text-gray-700">
+                                Ticket: ₹{day[time].ticket_price}
+                              </p>
+                              <p className="text-sm text-gray-700">
+                                Best time: {day[time].best_time_to_visit}
+                              </p>
                             </div>
                           </div>
                         ))}
